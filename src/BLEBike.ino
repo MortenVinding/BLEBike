@@ -12,8 +12,9 @@
 #define CADENCE
 #define FITNESS
 //#define HEART_BEACON 
-//#define HEART_PIN 19 // untested
-#define HEART_CLIENT
+#define HEART_PIN 19 // untested
+const uint32_t heartSensorPin = 19;
+//#define HEART_CLIENT
 
 //#define WHEEL // Adds WHEEL to cadence; not supported in power as that would need a control point
 #define LIBRARY_HD44780
