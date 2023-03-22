@@ -2,11 +2,21 @@
  * MIT License
 */
 
+#include <Arduino.h>
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <AsyncElegantOTA.h>
+
 #include <NimBLEDevice.h>
 #include <NimBLEUtils.h>
 #include <NimBLEServer.h>
 #include <ArduinoNvs.h> // https://github.com/rpolitex/ArduinoNvs
 #include "debounce.h"
+
+const char* ssid = "WIFI SSID";
+const char* password = "WIFI PASSWORD";
+const char* hostname = "blebike";
 
 #define POWER
 #define CADENCE
@@ -19,15 +29,17 @@ const uint32_t heartSensorPin = 19;
 //#define WHEEL // Adds WHEEL to cadence; not supported in power as that would need a control point
 #define LIBRARY_HD44780
 #define PULLUP_ON_ROTATION_DETECT // handy for debugging
+#define PULLUP_ON_HEART_SENSOR // handy for debugging
 
 #if defined(HEART_BEACON) || defined(HEART_PIN) || defined(HEART_CLIENT)
 # define HEART
 #endif
 
-#define HEART_MIBAND_UcUID16 0xFEE0 
+#define HEART_MIBAND_UUID16 0xFEE0 
 
 #define DEVICE_NAME "BLEBike"
 const uint32_t rotationDetectPin = 23;
+AsyncWebServer server(80);
 
 #ifdef LIBRARY_HD44780
 # include <hd44780.h>
@@ -977,9 +989,33 @@ void clear()
 
 void setup()
 {
+  Serial.begin(115200);
 //uint8_t new_mac[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x07};
 //esp_base_mac_addr_set(new_mac);
 
+  WiFi.mode(WIFI_STA);
+  WiFi.setHostname(hostname);
+  WiFi.begin(ssid, password);
+  Serial.println("");
+
+  // Wait for connection
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("");
+  Serial.print("Connected to ");
+  Serial.println(ssid);
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/html", "Hi!<br>To update go to <a href=\"/update\">/update</a>");
+  });
+
+  AsyncElegantOTA.begin(&server);    // Start ElegantOTA
+  server.begin();
+  Serial.println("HTTP server started");
   
   pinMode(BACKLIGHT, OUTPUT);
   dacWrite(BACKLIGHT,brightnessValue);
@@ -1000,7 +1036,11 @@ void setup()
   pinMode(rotationDetectPin, INPUT); 
 #endif  
 #ifdef HEART_PIN
-  pinMode(HEART_PIN, INPUT);
+  #ifdef PULLUP_ON_HEART_SENSOR  
+    pinMode(HEART_PIN, INPUT_PULLUP);
+  #else
+    pinMode(HEART_PIN, INPUT);
+  #endif  
   attachInterrupt(HEART_PIN, heartISR, CHANGE);
 #endif
   // it would be better to trigger on FALLING or on RISING, but the debounce would be tricky,
@@ -1481,11 +1521,11 @@ void loop ()
   if (!rev || _lastRotationDuration == 0)
     rpm = 0;
   else if (_lastRotationDuration < t - prevRotationMarker) {
-    rpm = 60000 / (t - prevRotationMarker);
+    rpm = 120000 / (t - prevRotationMarker);
     _power = calculatePower(t - prevRotationMarker);
   }
   else 
-    rpm = 60000 / _lastRotationDuration;
+    rpm = 120000 / _lastRotationDuration;
 
   noInterrupts();
   if (!showedMenu) 
@@ -1533,7 +1573,7 @@ void loop ()
   static uint32_t lastHeartRateUpdate = 0;
 
   if (millis() >= lastHeartRateUpdate + 1000 && lastHeartBeatDuration > 0 && millis() <= prevHeartBeat + 4000) {
-    uint16_t heartRate = (1000 + lastHeartBeatDuration/2) / lastHeartBeatDuration;
+    uint16_t heartRate = (10000 + lastHeartBeatDuration/2) / lastHeartBeatDuration;
     lastHeartRate = heartRate;
     lastHeartRateTime = prevHeartBeat;
 
