@@ -1,0 +1,19 @@
+# Ignore Platformio lib, cache and build
+.pio
+
+# Ignore MacOS internal files
+.DS_Store
+
+# Ignore WiFi credentials file
+src/Credentials.h
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/c_cpp_properties.json
+*.code-workspace
+
+# Local History for Visual Studio Code
+.history/

@@ -13,9 +13,8 @@
 #include <NimBLEServer.h>
 #include <ArduinoNvs.h> // https://github.com/rpolitex/ArduinoNvs
 #include "debounce.h"
+#include <Credentials.h>
 
-const char* ssid = "WIFI SSID";
-const char* password = "WIFI PASSWORD";
 const char* hostname = "blebike";
 
 #define POWER
@@ -995,7 +994,7 @@ void setup()
 
   WiFi.mode(WIFI_STA);
   WiFi.setHostname(hostname);
-  WiFi.begin(ssid, password);
+  WiFi.begin(WIFI_SSID, WIFI_PW);
   Serial.println("");
 
   // Wait for connection
@@ -1005,7 +1004,7 @@ void setup()
   }
   Serial.println("");
   Serial.print("Connected to ");
-  Serial.println(ssid);
+  Serial.println(WIFI_SSID);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 
