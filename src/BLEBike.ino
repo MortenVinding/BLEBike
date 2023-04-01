@@ -15,7 +15,7 @@
 #include "debounce.h"
 #include <Credentials.h>
 
-const char* hostname = "blebike";
+const char* HOSTNAME = "blebike";
 
 #define POWER
 #define CADENCE
@@ -27,8 +27,8 @@ const uint32_t heartSensorPin = 19;
 
 //#define WHEEL // Adds WHEEL to cadence; not supported in power as that would need a control point
 #define LIBRARY_HD44780
-#define PULLUP_ON_ROTATION_DETECT // handy for debugging
-#define PULLUP_ON_HEART_SENSOR // handy for debugging
+//#define PULLUP_ON_ROTATION_DETECT // handy for debugging
+//#define PULLUP_ON_HEART_SENSOR // handy for debugging
 
 #if defined(HEART_BEACON) || defined(HEART_PIN) || defined(HEART_CLIENT)
 # define HEART
@@ -183,7 +183,7 @@ const uint32_t gearRatio2 = 2;
 #define GROSS_EFFICIENCYx1000 195 // 195 recumbent, 206 upright, at max power output: https://doi.org/10.3389/fspor.2021.667564
 #define MJ_TO_KCALx1000 239
 #define NUM_RESISTANCES 8
-#define RADIUSX1000 149 // radius of crank in meters * 1000 (= radius of crank in mm)
+#define RADIUSX1000 155 // radius of crank in meters * 1000 (= radius of crank in mm)
 
 #define FV(x) (uint32_t)(2 * PI * RADIUSX1000 * (x) + 0.5)
 
@@ -199,7 +199,7 @@ const uint32_t mechanicalPartsX1000[NUM_RESISTANCES] =
 // resistance model: force = - resistanceCoeffRots * rotationsPerTime - mechanicalFriction
 // The following are the k values from https://www.instructables.com/Measure-Exercise-Bike-Powercalorie-Usage/
 // multiplied by a factor of 10.
-const uint32_t resistanceCoeffRotsX10[NUM_RESISTANCES] = {285,544,802,1052,1393,1671,1873,1969}; 
+const uint32_t resistanceCoeffRotsX10[NUM_RESISTANCES] = {570,1088,1604,2104,2786,3342,3746,3938}; 
 const uint32_t _2_pi_r_100000 = (uint32_t) (2 * PI * RADIUSX1000 * 100 + 0.5);
 const uint32_t mechanicalPartX1000 = FV( 7.84 );   // mechanical friction measured at 7.84 Newtons
 #define WATTS(rpm,i) ( (2 * PI * (RADIUSX1000/1000.) * (rpm)/60. * ( resistanceCoeffRotsX10[(i)]/10.*(rpm)/60.)) + mechanicalPartX1000/1000. * (rpm)/60.)
@@ -863,6 +863,11 @@ void InitNimBLE()
 #endif  
 }
 
+void disableBluetooth() {
+  Serial.print("Disabling bluetooth");
+  NimBLEDevice::deinit(false);
+}
+
 void setResistance(uint32_t value) {  
     resistanceValue = value;
 }
@@ -992,8 +997,8 @@ void setup()
 //uint8_t new_mac[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x07};
 //esp_base_mac_addr_set(new_mac);
 
+  WiFi.setHostname(HOSTNAME);
   WiFi.mode(WIFI_STA);
-  WiFi.setHostname(hostname);
   WiFi.begin(WIFI_SSID, WIFI_PW);
   Serial.println("");
 
@@ -1009,7 +1014,26 @@ void setup()
   Serial.println(WiFi.localIP());
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/html", "Hi!<br>To update go to <a href=\"/update\">/update</a>");
+    String html = "<html><body>";
+    html += "<head><meta charset=\"UTF-8\"><title>BLEBike</title></head>";
+    html += "<h1>Hi!</h1><br>Compile date: " __DATE__ "<br>Compile time: " __TIME__ "<br><br>";
+    html += "<form action='/disablebt' method='post'><input type='submit' value='Update'></form>";
+    html += "<form action='/reset' method='post'><input type='submit' value='Reset'></form>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+  });
+
+  server.on("/reset", HTTP_POST, [](AsyncWebServerRequest *request){
+    ESP.restart();
+  });
+
+  server.on("/disablebt", HTTP_POST, [](AsyncWebServerRequest *request){
+    String html = "<html><body>";
+    html += "<head><meta charset=\"UTF-8\"><meta http-equiv=\"refresh\" content=\"0; url=/update\"><title>Updating...</title></head>";
+    html += "<h1>Bluetooth disabled</h1><br>To update go to <a href=\"/update\">/update</a><br><br>";
+    html += "</body></html>";
+    request->send(200, "text/html", html);
+    disableBluetooth();
   });
 
   AsyncElegantOTA.begin(&server);    // Start ElegantOTA
@@ -1535,7 +1559,6 @@ void loop ()
     
     rpm = (60000 + dt/2) / dt;
     rpm_x2 = (120000 + dt/2) / dt;
-  }
 
   noInterrupts();
   if (!showedMenu) 
@@ -1586,6 +1609,10 @@ void loop ()
     uint16_t heartRate = (60000 + lastHeartBeatDuration/2) / lastHeartBeatDuration;
     lastHeartRate = heartRate;
     lastHeartRateTime = prevHeartBeat;
+    Serial.print("heartRate: ");
+    Serial.println(heartRate);
+    Serial.print("lastHeartRateTime: ");
+    Serial.println(lastHeartRateTime);
 
     if (heartServiceEnabled) {    
       if (heartRate <= 255) {
@@ -1639,6 +1666,4 @@ void loop ()
     bikeDataCharacteristics.notify();
   }
 #endif
-
-
 }
