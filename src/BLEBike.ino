@@ -1559,6 +1559,7 @@ void loop ()
     
     rpm = (60000 + dt/2) / dt;
     rpm_x2 = (120000 + dt/2) / dt;
+  }
 
   noInterrupts();
   if (!showedMenu) 
